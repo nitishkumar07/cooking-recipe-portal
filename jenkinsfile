@@ -64,7 +64,7 @@ pipeline {
                 script {
                     withSonarQubeEnv('jenkins-sonarqube') {
                         sh """
-                            cd ${FRONTEND_PATH}
+                            dir ("${FRONTEND_PATH}") 
                             sonar-scanner \
                               -Dsonar.projectKey=frontend \
                               -Dsonar.projectName=frontend \
@@ -117,7 +117,7 @@ pipeline {
                 script {
                     withSonarQubeEnv('jenkins-sonarqube') {
                         sh """
-                            cd server
+                            dir ("$BACKEND_PATH")
                             sonar-scanner \
                               -Dsonar.projectKey=backend \
                               -Dsonar.projectName=backend \
