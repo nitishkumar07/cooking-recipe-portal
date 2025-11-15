@@ -7,7 +7,7 @@ const Footer = () => {
       <div className="content has-text-centered">
         <p>
           <strong>Built</strong> by{" "}
-          <a href="nitishkumar07.hashnode.dev" target="_blank">
+          <a href="https://www.linkedin.com/in/nitishkumarjg/" target="_blank">
             Nitishkumar
           </a>
         </p>
