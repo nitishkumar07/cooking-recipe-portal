@@ -39,13 +39,13 @@ pipeline {
             steps {
                 script {
                     // Check if files inside 'app/' folder changed
-                    frontend_changed = sh(
+                    def frontend_changed = sh(
                         script: "git diff --name-only HEAD~1 HEAD | grep '^${FRONTEND_PATH}/' || true",
                         returnStdout: true
                     ).trim()
 
                     // Check if files inside 'server/' folder changed
-                    backend_changed = sh(
+                    def backend_changed = sh(
                         script: "git diff --name-only HEAD~1 HEAD | grep '^${BACKEND_PATH}/' || true",
                         returnStdout: true
                     ).trim()
@@ -62,7 +62,7 @@ pipeline {
             when { expression { frontend_changed != "" } }
             steps {
                 script {
-                    withSonarQubeEnv('sonarqube1') {
+                    withSonarQubeEnv('jenkins-sonarqube') {
                         sh """
                             cd ${FRONTEND_PATH}
                             sonar-scanner \
@@ -115,7 +115,7 @@ pipeline {
             when { expression { backend_changed != "" } }
             steps {
                 script {
-                    withSonarQubeEnv('sonarqube1') {
+                    withSonarQubeEnv('jenkins-sonarqube') {
                         sh """
                             cd server
                             sonar-scanner \
