@@ -1,0 +1,172 @@
+pipeline {
+    agent any
+
+    environment {
+        REPO = "nitishkumar07/cooking-recipe-portal"
+        FRONTEND_PATH = "app"
+        BACKEND_PATH  = "server"
+        FRONTEND_IMAGE = "nitishkumar7/recipes_frontend"
+        BACKEND_IMAGE  = "nitishkumar7/recipes_backend"
+        DOCKERHUB_USER = "nitishkumar7"
+    }
+
+    stages {
+
+        /* ------------ CHECKOUT CODE ------------ */
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: "https://github.com/${REPO}.git",
+                    credentialsId: 'jenkins-github'
+            }
+        }
+        stage("Login to DockerHub") {
+            steps {
+                withCredentials([string(
+                    credentialsId: 'Dockerhub-jenkins',
+                    variable: 'DH_TOKEN'
+                )]) {
+                    sh '''
+                        echo "$DH_TOKEN" | docker login -u "${DOCKERHUB_USER}" --password-stdin
+                    '''
+                }
+            }
+        }
+
+
+        /* ------------ CHECK WHAT CHANGED ------------ */
+        stage('Detect Changes') {
+            steps {
+                script {
+                    // Check if files inside 'app/' folder changed
+                    frontend_changed = sh(
+                        script: "git diff --name-only HEAD~1 HEAD | grep '^${FRONTEND_PATH}/' || true",
+                        returnStdout: true
+                    ).trim()
+
+                    // Check if files inside 'server/' folder changed
+                    backend_changed = sh(
+                        script: "git diff --name-only HEAD~1 HEAD | grep '^${BACKEND_PATH}/' || true",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Frontend changed: ${frontend_changed != ''}"
+                    echo "Backend changed: ${backend_changed != ''}"
+                }
+            }
+        }
+
+        /* ------------ FRONTEND PIPELINE ------------ */
+
+        stage('Sonar - Frontend') {
+            when { expression { frontend_changed != "" } }
+            steps {
+                script {
+                    withSonarQubeEnv('sonarqube1') {
+                        sh """
+                            cd ${FRONTEND_PATH}
+                            sonar-scanner \
+                              -Dsonar.projectKey=frontend \
+                              -Dsonar.projectName=frontend \
+                              -Dsonar.projectVersion=${BUILD_NUMBER} \
+                              -Dsonar.sources=src \
+                              -Dsonar.exclusions=**/node_modules/**,**/dist/**
+                        """
+                    }
+                }
+            }
+        }
+        stage('Quality Gate - Frontend') {
+            when { expression { frontend_changed != "" } }
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Build Frontend Image') {
+            when { expression { frontend_changed != "" } }
+            steps {
+                sh """
+                    docker build -t ${FRONTEND_IMAGE}:${env.BUILD_NUMBER} ${FRONTEND_PATH}
+                """
+            }
+        }
+        stage('Trivy Scan - Frontend') {
+            when { expression { frontend_changed != "" } }
+            steps {
+                sh """
+                    echo "Running Trivy scan for Frontend image..."
+                    trivy image --exit-code 1 --severity CRITICAL ${FRONTEND_IMAGE}:${env.BUILD_NUMBER}"""
+            }
+        }
+        stage("Push Frontend Images") {
+            when { expression { frontend_changed != "" } }
+            steps {
+                sh "docker push ${FRONTEND_IMAGE}:${env.BUILD_NUMBER}"
+            }
+        }
+
+
+        /* ------------ BACKEND PIPELINE ------------ */
+
+        stage('Sonar - Backend') {
+            when { expression { backend_changed != "" } }
+            steps {
+                script {
+                    withSonarQubeEnv('sonarqube1') {
+                        sh """
+                            cd server
+                            sonar-scanner \
+                              -Dsonar.projectKey=backend \
+                              -Dsonar.projectName=backend \
+                              -Dsonar.projectVersion=${BUILD_NUMBER} \
+                              -Dsonar.sources=. \
+                              -Dsonar.inclusions=**/*.js \
+                              -Dsonar.exclusions=node_modules/**,Dockerfile \
+                              -Dsonar.language=js
+                        """
+                    }
+                }
+            }
+        }
+        stage('Quality Gate - Backend') {
+            when { expression { backend_changed != "" } }
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        
+
+        stage('Build Backend Image') {
+            when { expression { backend_changed != "" } }
+            steps {
+                sh """
+                    docker build -t ${BACKEND_IMAGE}:${env.BUILD_NUMBER} ${BACKEND_PATH}
+                """
+            }
+        }
+        stage('Trivy Scan - Backend') {
+            when { expression { backend_changed != "" } }
+            steps {
+                sh """echo "Running Trivy scan for Backend image..."
+                    trivy image --exit-code 1 --severity CRITICAL ${BACKEND_IMAGE}:${env.BUILD_NUMBER}"""
+            }
+        }
+        stage("Push Backend Images") {
+            when { expression { backend_changed != "" } }
+            steps {
+                sh "docker push ${BACKEND_IMAGE}:${env.BUILD_NUMBER}"
+            }
+        }
+
+    }
+    post {
+        always {
+            sh "docker logout"
+        }
+    }
+}
