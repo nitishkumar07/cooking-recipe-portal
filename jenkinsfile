@@ -62,14 +62,19 @@ pipeline {
         }
 
         /* ------------ FRONTEND PIPELINE ------------ */
-        withSonarQubeEnv('SonarQube') {
-            sh """
-                sonar-scanner \
-                  -Dsonar.projectKey=recipies \
-                  -Dsonar.projectName=recipies \
-                  -Dsonar.sources=app,server
-            """
+        stage('SonarQube Analysis (Frontend + Backend)') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh """
+                        sonar-scanner \
+                          -Dsonar.projectKey=recipies \
+                          -Dsonar.projectName=recipies \
+                          -Dsonar.sources=app,server
+                    """
+                }
+            }
         }
+
 
         stage('Quality Gate') {
             steps {
