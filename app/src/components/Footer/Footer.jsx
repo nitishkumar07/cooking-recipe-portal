@@ -8,7 +8,7 @@ const Footer = () => {
         <p>
           <strong>Built</strong> by{" "}
           <a href="https://www.linkedin.com/in/nitishkumarjg/" target="_blank">
-            Nitishkumar J G
+            Nitishkumar
           </a>
         </p>
       </div>
